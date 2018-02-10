@@ -212,10 +212,54 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
         return NULL;
     }
 
-    // allocate new node heap
-    node_pt nnh = (node_pt)malloc(sizeof(node_pt));
 
-    return NULL;
+    // allocate new node heap
+    mgm->node_heap = (node_pt)malloc(MEM_NODE_HEAP_INIT_CAPACITY * sizeof(node_pt));
+    // check if successful
+    if(mgm->node_heap == NULL)
+    {
+        // free pool and mem mgr
+        free(mgm->pool.mem);
+        free(mgm);
+        return NULL;
+    }
+
+    // allocate new gap index
+    mgm->gap_ix = (gap_pt)malloc(MEM_GAP_IX_INIT_CAPACITY * sizeof(gap_pt));
+    // check if successful
+    if(mgm->gap_ix == NULL)
+    {
+        // free pool and mem mgr and node heap
+        free(mgm->pool.mem);
+        free(mgm->node_heap);
+        free(mgm);
+        return NULL;
+    }
+
+    // initialize top node of node heap
+    mgm->node_heap[0].allocated = 0;
+    mgm->node_heap[0].next = NULL;
+    mgm->node_heap[0].prev = NULL;
+    mgm->node_heap[0].used = 1;
+    mgm->node_heap[0].alloc_record.size = size;
+    mgm->node_heap[0].alloc_record.mem = mgm->pool.mem;
+
+     // initialize top node of gap index
+    mgm->gap_ix[0].size = size;
+    mgm->gap_ix[0].node = mgm->node_heap;
+
+    // initialize pool mgr
+    mgm->gap_ix_capacity = MEM_GAP_IX_INIT_CAPACITY;
+    mgm->total_nodes = MEM_NODE_HEAP_INIT_CAPACITY;
+    mgm->used_nodes = 1;
+
+    // link pool mgr to pool store
+    pool_store[pool_store_size] = mgm;
+    // increment pool_store_size
+    pool_store_size++;
+
+    // return the address of the mgr, cast to (pool_pt)
+    return (pool_pt)mgm;
 }
 
 alloc_status mem_pool_close(pool_pt pool) {
@@ -229,6 +273,8 @@ alloc_status mem_pool_close(pool_pt pool) {
     // find mgr in pool store and set to null
     // note: don't decrement pool_store_size, because it only grows
     // free mgr
+
+
 
     return ALLOC_FAIL;
 }
