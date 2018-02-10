@@ -114,7 +114,7 @@ alloc_status mem_init()
          * then make the size of pool store 0
          *
          */
-        pool_store = (pool_mgr_pt*)malloc(MEM_POOL_STORE_INIT_CAPACITY, sizeof(pool_mgr_pt));
+        pool_store = (pool_mgr_pt*)malloc(MEM_POOL_STORE_INIT_CAPACITY * sizeof(pool_mgr_pt));
         pool_store_capacity = MEM_POOL_STORE_INIT_CAPACITY;
         pool_store_size = 0;
         // assert pool_store not null
