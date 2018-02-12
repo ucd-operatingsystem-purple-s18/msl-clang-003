@@ -173,6 +173,7 @@ static void test_pool_smoketest(void **state) {
         INFO("Allocating pool of %lu bytes with policy %s\n",
              (long) pool_size, (POOL_POLICY == FIRST_FIT) ? "FIRST_FIT" : "BEST_FIT");
         pool = mem_pool_open(pool_size, POOL_POLICY);
+
         assert_non_null(pool);
         assert_non_null(pool->mem);
         assert_int_equal(pool->policy, POOL_POLICY);

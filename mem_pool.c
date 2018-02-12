@@ -188,7 +188,7 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
     _mem_resize_pool_store();
 
     // allocate a new mem pool mgr
-    pool_mgr_pt mem_mgr = calloc(1, sizeof(pool_mgr_pt));
+    pool_mgr_pt mem_mgr = (pool_mgr_pt ) calloc(1, sizeof(pool_mgr_t));
     // check if successful
     if(mem_mgr == NULL)
     {
@@ -204,7 +204,7 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
     mem_mgr->pool.total_size = size;
 
     // check if successful
-    if(&mem_mgr->pool == NULL)
+    if(&mem_mgr->pool.mem == NULL)
     {
         free(mem_mgr);
         return NULL;
@@ -282,13 +282,13 @@ alloc_status mem_pool_close(pool_pt pool) {
     }
 
     // check if pool has only one gap
-    if(mem_mgr->pool.num_gaps == 1)
+    if(mem_mgr->pool.num_gaps != 1)
     {
         return ALLOC_NOT_FREED;
     }
 
     // check if it has zero allocations
-    if(mem_mgr->pool.alloc_size == 0)
+    if(mem_mgr->pool.alloc_size != 0)
     {
         return ALLOC_NOT_FREED;
     }
