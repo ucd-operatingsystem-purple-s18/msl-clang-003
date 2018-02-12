@@ -522,7 +522,144 @@ alloc_status mem_del_alloc(pool_pt pool, void * alloc) {
     // add the resulting node to the gap index
     // check success
 
-    return ALLOC_FAIL;
+
+    // get mgr from pool by casting the pointer to (pool_mgr_pt)
+    pool_mgr_pt mem_mgr = (pool_mgr_pt) pool;
+
+    // get node from alloc by casting the pointer to (node_pt)
+    node_pt temp_node = (node_pt) alloc;
+
+    // boolean for found
+    int bool_found = 0;
+
+    // find the node in the node heap
+    for(int i = 0; i < mem_mgr->total_nodes; i++)
+    {
+        if(temp_node == &mem_mgr->node_heap[i])
+        {
+            bool_found = 1;
+            break;
+        }
+    }
+    // this is node-to-delete
+    // make sure it's found
+    if(!bool_found)
+    {
+        return ALLOC_NOT_FREED;
+    }
+
+    // convert to gap node
+    temp_node->allocated = 0;
+    temp_node->used = 1;
+
+    // update metadata (num_allocs, alloc_size)
+    mem_mgr->pool.num_allocs--;
+    mem_mgr->pool.alloc_size -= temp_node->alloc_record.size;
+
+    // if the next node in the list is also a gap, merge into node-to-delete
+    if(temp_node->next != NULL && temp_node->next->allocated == 0)
+    {
+        //   remove the next node from gap index
+        //   check success
+        if(_mem_remove_from_gap_ix(mem_mgr,temp_node->alloc_record.size, temp_node->next) == ALLOC_NOT_FREED)
+        {
+            return ALLOC_NOT_FREED;
+        }
+
+        //   add the size to the node-to-delete
+        temp_node->alloc_record.size += temp_node->next->alloc_record.size;
+
+        //   update node as unused
+        temp_node->used = 0;
+        temp_node->alloc_record.size = 0;
+        temp_node->alloc_record.mem = NULL;
+
+        //   update metadata (used nodes)
+        mem_mgr->used_nodes--;
+
+        //   update linked list:
+        /*
+                    if (next->next) {
+                        next->next->prev = node_to_del;
+                        node_to_del->next = next->next;
+                    } else {
+                        node_to_del->next = NULL;
+                    }
+                    next->next = NULL;
+                    next->prev = NULL;
+        */
+        if (temp_node->next->next != NULL)
+        {
+            temp_node->next->next->prev = temp_node;
+            temp_node->next = temp_node->next->next;
+        }
+        else
+        {
+            temp_node->next = NULL;
+        }
+        temp_node->next->next = NULL;
+        temp_node->next->prev = NULL;
+    }
+
+    // this merged node-to-delete might need to be added to the gap index
+    // but one more thing to check...
+    // if the previous node in the list is also a gap, merge into previous!
+    if(temp_node->prev != NULL && !(temp_node->prev->allocated))
+    {
+
+        //   remove the previous node from gap index
+        //   check success
+        if(_mem_remove_from_gap_ix(mem_mgr, temp_node->prev->alloc_record.size, temp_node) == ALLOC_NOT_FREED)
+        {
+            return ALLOC_NOT_FREED;
+        }
+
+        //   add the size of node-to-delete to the previous
+        temp_node->prev->alloc_record.size += temp_node->alloc_record.size;
+
+        //   update node-to-delete as unused
+        temp_node->used = 0;
+        temp_node->alloc_record.size = 0;
+        temp_node->alloc_record.mem = NULL;
+
+        //   update metadata (used_nodes)
+        mem_mgr->used_nodes--;
+
+        //   update linked list
+        /*
+                        if (node_to_del->next) {
+                            prev->next = node_to_del->next;
+                            node_to_del->next->prev = prev;
+                        } else {
+                            prev->next = NULL;
+                        }
+                        node_to_del->next = NULL;
+                        node_to_del->prev = NULL;
+         */
+        if(temp_node->next != NULL)
+        {
+            temp_node->prev->next = temp_node->next;
+            temp_node->next->prev = temp_node->prev;
+        }
+        else
+        {
+            temp_node->prev->next = NULL;
+        }
+        temp_node->next = NULL;
+        temp_node->prev = NULL;
+
+        //   change the node to add to the previous node!
+        temp_node = temp_node->prev;
+    }
+
+    // add the resulting node to the gap index
+    // check success
+    if(_mem_add_to_gap_ix(mem_mgr, temp_node->alloc_record.size, temp_node) == ALLOC_FAIL)
+    {
+        return ALLOC_NOT_FREED;
+    }
+
+    return ALLOC_OK;
 }
 
 void mem_inspect_pool(pool_pt pool,
@@ -538,6 +675,32 @@ void mem_inspect_pool(pool_pt pool,
                     *segments = segs;
                     *num_segments = pool_mgr->used_nodes;
      */
+
+    // get the mgr from the pool
+    pool_mgr_pt mem_mgr = (pool_mgr_pt) pool;
+
+    // allocate the segments array with size == used_nodes
+    pool_segment_pt pool_seg = malloc(mem_mgr->used_nodes * sizeof(pool_segment_pt));
+
+    // check successful
+    if(pool_seg != NULL)
+    {
+
+        // loop through the node heap and the segments array
+        //    for each node, write the size and allocated in the segment
+        for(int i = 0; i < mem_mgr->used_nodes; i++)
+        {
+            pool_seg->size = mem_mgr->node_heap[i].alloc_record.size;
+            pool_seg->allocated = mem_mgr->node_heap[i].allocated;
+        }
+    }
+    // "return" the values:
+    /*
+                    *segments = segs;
+                    *num_segments = pool_mgr->used_nodes;
+     */
+    *segments = pool_seg;
+    *num_segments = mem_mgr->used_nodes;
 }
 
 
