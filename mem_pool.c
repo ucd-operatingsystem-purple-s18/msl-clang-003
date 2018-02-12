@@ -114,7 +114,7 @@ alloc_status mem_init()
          * then make the size of pool store 0
          *
          */
-        pool_store = (pool_mgr_pt*)malloc(MEM_POOL_STORE_INIT_CAPACITY * sizeof(pool_mgr_pt));
+        pool_store = (pool_mgr_pt*) calloc(MEM_POOL_STORE_INIT_CAPACITY, sizeof(pool_mgr_pt));
         pool_store_capacity = MEM_POOL_STORE_INIT_CAPACITY;
         pool_store_size = 0;
 
@@ -136,22 +136,21 @@ alloc_status mem_free()
     {
         return ALLOC_CALLED_AGAIN;
     }
-
     /* pool_store is an array of pointers
      * first loop through each element of array
      */
     for(int i = 0; i < pool_store_size; i++)
     {
-        // if not null we need to deallocate
+        // if not null we fail
         if(pool_store[i] != NULL)
         {
-            mem_pool_close((pool_pt) pool_store[i]);
+            return ALLOC_FAIL;
         }
 
     }
     // free pool_store and set to null
     free(pool_store);
-    pool_store == NULL;
+    pool_store = NULL;
 
     // update static variables
     pool_store_size = 0;
@@ -185,17 +184,11 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
         return NULL;
     }
 
-    
-    if(_mem_resize_pool_store() == ALLOC_FAIL)
-    {
-        /* in this case we have an error
-         * return NULL
-         */
-        return NULL;
-    }
+
+    _mem_resize_pool_store();
 
     // allocate a new mem pool mgr
-    pool_mgr_pt mem_mgr = (pool_mgr_pt)malloc(sizeof(pool_mgr_pt));
+    pool_mgr_pt mem_mgr = calloc(1, sizeof(pool_mgr_pt));
     // check if successful
     if(mem_mgr == NULL)
     {
@@ -203,9 +196,15 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
     }
 
     // allocate new memory pool
-    mem_new_alloc((pool_pt)mem_mgr, sizeof(pool_pt));
+    mem_mgr->pool.mem = (char*) calloc(size, sizeof(char));
+    mem_mgr->pool.num_allocs = 0;
+    mem_mgr->pool.policy = policy;
+    mem_mgr->pool.num_gaps = 1;
+    mem_mgr->pool.alloc_size = 0;
+    mem_mgr->pool.total_size = size;
+
     // check if successful
-    if(mem_mgr->pool.mem == NULL)
+    if(&mem_mgr->pool == NULL)
     {
         free(mem_mgr);
         return NULL;
@@ -213,7 +212,7 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
 
 
     // allocate new node heap
-    mem_mgr->node_heap = (node_pt)malloc(MEM_NODE_HEAP_INIT_CAPACITY * sizeof(node_pt));
+    mem_mgr->node_heap = (node_pt) calloc(MEM_NODE_HEAP_INIT_CAPACITY, sizeof(node_t));
     // check if successful
     if(mem_mgr->node_heap == NULL)
     {
@@ -224,7 +223,7 @@ pool_pt mem_pool_open(size_t size, alloc_policy policy) {
     }
 
     // allocate new gap index
-    mem_mgr->gap_ix = (gap_pt)malloc(MEM_GAP_IX_INIT_CAPACITY * sizeof(gap_pt));
+    mem_mgr->gap_ix = (gap_pt) calloc(MEM_GAP_IX_INIT_CAPACITY, sizeof(gap_t));
     // check if successful
     if(mem_mgr->gap_ix == NULL)
     {
@@ -872,4 +871,3 @@ static alloc_status _mem_sort_gap_ix(pool_mgr_pt pool_mgr) {
 static alloc_status _mem_invalidate_gap_ix(pool_mgr_pt pool_mgr) {
     return ALLOC_FAIL;
 }
-
